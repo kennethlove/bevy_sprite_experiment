@@ -15,12 +15,14 @@ const SPRITE_RENDER_HEIGHT: f32 = 64.;
 const SPRITE_IDX_STAND: usize = 0;
 const SPRITE_IDX_IDLE: &[usize] = &[0, 1];
 const SPRITE_IDX_WALK: &[usize] = &[16, 17, 18, 19];
-const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42, 43, 44, 45, 46, 47];
-const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(90);
-const WALK_CYCLE_DELAY: Duration = Duration::from_millis(70);
-const JUMP_CYCLE_DELAY: Duration = Duration::from_millis(70);
+const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
+const SPRITE_IDX_FALL: &[usize] = &[43, 44, 45, 46, 47];
+const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(2000);
+const WALK_CYCLE_DELAY: Duration = Duration::from_millis(500);
+const RISE_CYCLE_DELAY: Duration = Duration::from_millis(700);
+const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
 const PLAYER_VELOCITY_X: f32 = 400.;
-const PLAYER_VELOCITY_Y: f32 = 850.;
+const PLAYER_VELOCITY_Y: f32 = 450.;
 
 const MAX_JUMP_HEIGHT: f32 = 230.;
 
@@ -47,9 +49,10 @@ impl Plugin for PlayerPlugin {
                 jump,
                 rise,
                 fall,
-                apply_movement_animation,
-                apply_idle_sprite,
-                apply_jump_sprite,
+                apply_idle_animation,
+                // apply_movement_animation,
+                // apply_rise_sprite,
+                // apply_fall_sprite,
                 update_direction,
                 update_sprite_direction,
             ),
@@ -62,7 +65,7 @@ fn setup(
     mut atlases: ResMut<Assets<TextureAtlasLayout>>,
     asset_server: Res<AssetServer>,
 ) {
-    let image_handle: Handle<Image> = asset_server.load("AnimationSheet_Character.png");
+    let texture: Handle<Image> = asset_server.load("AnimationSheet_Character.png");
     let texture_atlas = TextureAtlasLayout::from_grid(
         Vec2::new(SPRITE_TILE_WIDTH, SPRITE_TILE_HEIGHT),
         SPRITESHEET_COLS,
@@ -72,32 +75,31 @@ fn setup(
     );
     let atlas_handle = atlases.add(texture_atlas);
 
-    commands
-        .spawn(SpriteSheetBundle {
-            sprite: Sprite::default(),
-            atlas: TextureAtlas {
-                layout: atlas_handle,
-                index: SPRITE_IDX_STAND,
-            },
-            texture: image_handle,
-            transform: Transform {
-                translation: Vec3::new(WINDOW_LEFT_X + 100., WINDOW_BOTTOM_Y + 300., 0.),
-                scale: Vec3::new(
-                    SPRITE_RENDER_WIDTH / SPRITE_TILE_WIDTH,
-                    SPRITE_RENDER_HEIGHT / SPRITE_TILE_HEIGHT,
-                    1.,
-                ),
-                ..default()
-            },
+    commands.spawn(SpriteSheetBundle {
+        sprite: Sprite::default(),
+        atlas: TextureAtlas {
+            layout: atlas_handle,
+            index: SPRITE_IDX_IDLE[0],
+        },
+        texture,
+        transform: Transform {
+            translation: Vec3::new(WINDOW_LEFT_X + 100., WINDOW_BOTTOM_Y + 300., 0.),
+            scale: Vec3::new(
+                SPRITE_RENDER_WIDTH / SPRITE_TILE_WIDTH,
+                SPRITE_RENDER_HEIGHT / SPRITE_TILE_HEIGHT,
+                1.,
+            ),
             ..default()
-        })
-        .insert(RigidBody::KinematicPositionBased)
-        .insert(Collider::cuboid(
-            SPRITE_TILE_WIDTH / 2.,
-            SPRITE_TILE_HEIGHT / 2.,
-        ))
-        .insert(KinematicCharacterController::default())
-        .insert(Direction::Right);
+        },
+        ..default()
+    })
+    .insert(RigidBody::KinematicPositionBased)
+    .insert(Collider::cuboid(
+        SPRITE_TILE_WIDTH / 2.,
+        SPRITE_TILE_HEIGHT / 2.,
+    ))
+    .insert(KinematicCharacterController::default())
+    .insert(Direction::Right);
 }
 
 fn movement(
@@ -174,7 +176,7 @@ fn fall(time: Res<Time>, mut query: Query<&mut KinematicCharacterController, Wit
 
     let mut player = query.single_mut();
 
-    let movement = time.delta().as_secs_f32() * (PLAYER_VELOCITY_Y / 1.5) * -1.;
+    let movement = time.delta().as_secs_f32() * (PLAYER_VELOCITY_Y / 2.5) * -1.;
 
     match player.translation {
         Some(vec) => player.translation = Some(Vec2::new(vec.x, movement)),
@@ -192,26 +194,29 @@ fn apply_movement_animation(
 
     let (player, output) = query.single();
     if output.desired_translation.x != 0.0 && output.grounded {
+        info!("applying walk animation");
         commands
             .entity(player)
             .insert(Animation::new(SPRITE_IDX_WALK, WALK_CYCLE_DELAY));
     }
 }
 
-fn apply_idle_sprite(
+fn apply_idle_animation(
     mut commands: Commands,
     mut query: Query<(
         Entity,
         &KinematicCharacterControllerOutput,
-        &mut TextureAtlas,
-    )>,
+        // &mut TextureAtlas,
+    ), With<TextureAtlas>>,
+    // ), Without<Animation>>,
 ) {
     if query.is_empty() {
         return;
     }
 
-    let (player, output, mut sprite) = query.single_mut();
+    let (player, output) = query.single_mut();
     if output.desired_translation.x == 0.0 && output.grounded {
+        info!("applying idle animation");
         commands
             .entity(player)
             .insert(Animation::new(SPRITE_IDX_IDLE, IDLE_CYCLE_DELAY));
@@ -219,27 +224,56 @@ fn apply_idle_sprite(
     }
 }
 
-fn apply_jump_sprite(
+fn apply_rise_sprite(
     mut commands: Commands,
-    mut query: Query<(
-        Entity,
-        &KinematicCharacterControllerOutput,
-        &mut TextureAtlas,
-    )>,
+    mut query: Query<
+        (
+            Entity,
+            &KinematicCharacterControllerOutput,
+            &mut TextureAtlas,
+        ),
+        With<Jump>,
+    >,
 ) {
     if query.is_empty() {
         return;
     }
 
     let (player, output, mut sprite) = query.single_mut();
-    if !output.grounded {
+    if !output.grounded && output.desired_translation.y > 0. {
+        info!("applying rise sprite");
         commands
             .entity(player)
-            .insert(Animation::new(SPRITE_IDX_JUMP, JUMP_CYCLE_DELAY));
-        // sprite.index = SPRITE_IDX_JUMP[0];
+            .insert(Animation::new(SPRITE_IDX_JUMP, RISE_CYCLE_DELAY));
+        // sprite.index = SPRITE_IDX_JUMP[2];
     }
 }
 
+fn apply_fall_sprite(
+    mut commands: Commands,
+    mut query: Query<
+        (
+            Entity,
+            &KinematicCharacterControllerOutput,
+            &mut TextureAtlas,
+        ),
+        With<Jump>,
+    >,
+) {
+    if query.is_empty() {
+        return;
+    }
+
+    let (player, output, mut sprite) = query.single_mut();
+    if !output.grounded && output.desired_translation.y < 0. {
+        info!("applying fall sprite");
+        info!("{}", output.grounded);
+        commands
+            .entity(player)
+            .insert(Animation::new(SPRITE_IDX_FALL, FALL_CYCLE_DELAY));
+        // sprite.index = SPRITE_IDX_FALL[0];
+    }
+}
 fn update_direction(
     mut commands: Commands,
     query: Query<(Entity, &KinematicCharacterControllerOutput)>,

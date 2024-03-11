@@ -42,7 +42,7 @@ impl Plugin for PlatformsPlugin {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(PlatformBundle::new(-100.0, Vec3::new(75.0, 200.0, 1.0)));
-    commands.spawn(PlatformBundle::new(100.0, Vec3::new(50.0, 350.0, 1.0)));
-    commands.spawn(PlatformBundle::new(350.0, Vec3::new(150.0, 250.0, 1.0)));
+    // commands.spawn(PlatformBundle::new(-100.0, Vec3::new(75.0, 200.0, 1.0)));
+    // commands.spawn(PlatformBundle::new(100.0, Vec3::new(50.0, 350.0, 1.0)));
+    // commands.spawn(PlatformBundle::new(350.0, Vec3::new(150.0, 250.0, 1.0)));
 }

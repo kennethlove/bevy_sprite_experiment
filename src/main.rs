@@ -45,13 +45,8 @@ fn main() {
         .run();
 }
 
-#[derive(Component, Deref, DerefMut)]
-struct AnimationTimer(Timer);
-
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.spawn(Camera2dBundle::default());
 
