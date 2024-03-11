@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::animation::Animation;
+use crate::animation::{Animation, AnimationIndices, AnimationTimer};
 use crate::WINDOW_BOTTOM_Y;
 use crate::WINDOW_LEFT_X;
 use bevy::prelude::*;
@@ -10,14 +10,14 @@ const SPRITESHEET_COLS: usize = 8;
 const SPRITESHEET_ROWS: usize = 9;
 const SPRITE_TILE_WIDTH: f32 = 32.;
 const SPRITE_TILE_HEIGHT: f32 = 32.;
-const SPRITE_RENDER_WIDTH: f32 = 64.;
-const SPRITE_RENDER_HEIGHT: f32 = 64.;
+const SPRITE_RENDER_WIDTH: f32 = 128.;
+const SPRITE_RENDER_HEIGHT: f32 = 128.;
 const SPRITE_IDX_STAND: usize = 0;
 const SPRITE_IDX_IDLE: &[usize] = &[0, 1];
 const SPRITE_IDX_WALK: &[usize] = &[16, 17, 18, 19];
 const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
 const SPRITE_IDX_FALL: &[usize] = &[43, 44, 45, 46, 47];
-const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(2000);
+const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(750);
 const WALK_CYCLE_DELAY: Duration = Duration::from_millis(500);
 const RISE_CYCLE_DELAY: Duration = Duration::from_millis(700);
 const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
@@ -38,6 +38,14 @@ enum Direction {
     Right,
 }
 
+#[derive(Component, PartialEq)]
+enum Activity {
+    Idle,
+    Walk,
+    Jump,
+    Fall,
+}
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
@@ -50,7 +58,7 @@ impl Plugin for PlayerPlugin {
                 rise,
                 fall,
                 apply_idle_animation,
-                // apply_movement_animation,
+                apply_movement_animation,
                 // apply_rise_sprite,
                 // apply_fall_sprite,
                 update_direction,
@@ -99,15 +107,22 @@ fn setup(
         SPRITE_TILE_HEIGHT / 2.,
     ))
     .insert(KinematicCharacterController::default())
-    .insert(Direction::Right);
+    .insert(Direction::Right)
+    .insert(Activity::Idle)
+    .insert(AnimationIndices {
+        first: SPRITE_IDX_IDLE[0],
+        last: SPRITE_IDX_IDLE[1],
+    })
+    .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
 }
 
 fn movement(
+    mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<&mut KinematicCharacterController>,
+    mut query: Query<(Entity, &mut KinematicCharacterController)>,
 ) {
-    let mut player = query.single_mut();
+    let (entity, mut player) = query.single_mut();
 
     let mut movement = 0.0;
 
@@ -119,8 +134,14 @@ fn movement(
     }
 
     match player.translation {
-        Some(vec) => player.translation = Some(Vec2::new(movement, vec.y)),
-        None => player.translation = Some(Vec2::new(movement, 0.)),
+        Some(vec) => {
+            commands.entity(entity).insert(Activity::Walk);
+            player.translation = Some(Vec2::new(movement, vec.y))
+        },
+        None => {
+            commands.entity(entity).insert(Activity::Idle);
+            player.translation = Some(Vec2::new(movement, 0.))
+        },
     }
 }
 
@@ -184,20 +205,32 @@ fn fall(time: Res<Time>, mut query: Query<&mut KinematicCharacterController, Wit
     }
 }
 
+const WALK_CYCLE_INDICES: AnimationIndices = AnimationIndices {
+    first: 16, last: 19,
+};
 fn apply_movement_animation(
     mut commands: Commands,
-    query: Query<(Entity, &KinematicCharacterControllerOutput), Without<Animation>>,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput, &Activity, &mut TextureAtlas)>,
 ) {
     if query.is_empty() {
         return;
     }
 
-    let (player, output) = query.single();
+    let (player, output, activity, mut sprite) = query.single_mut();
+
+    if activity == &Activity::Walk {
+        info!("walking");
+        return;
+    }
+
     if output.desired_translation.x != 0.0 && output.grounded {
         info!("applying walk animation");
         commands
             .entity(player)
-            .insert(Animation::new(SPRITE_IDX_WALK, WALK_CYCLE_DELAY));
+            .insert(WALK_CYCLE_INDICES)
+            .insert(AnimationTimer(Timer::new(WALK_CYCLE_DELAY, TimerMode::Repeating)));
+
+        info!("sprite.index: {}", sprite.index);
     }
 }
 
@@ -206,22 +239,33 @@ fn apply_idle_animation(
     mut query: Query<(
         Entity,
         &KinematicCharacterControllerOutput,
-        // &mut TextureAtlas,
-    ), With<TextureAtlas>>,
+        &mut TextureAtlas,
+        &Activity,
+    )>,
     // ), Without<Animation>>,
 ) {
     if query.is_empty() {
         return;
     }
 
-    let (player, output) = query.single_mut();
-    if output.desired_translation.x == 0.0 && output.grounded {
+    let (player, output, mut sprite, activity) = query.single_mut();
+
+    if activity == &Activity::Idle {
+        info!("idling");
+        return;
+    }
+
+    if output.desired_translation.x == 0.0 && output.grounded && activity == &Activity::Idle {
         info!("applying idle animation");
         commands
             .entity(player)
-            .insert(Animation::new(SPRITE_IDX_IDLE, IDLE_CYCLE_DELAY));
-        // sprite.index = SPRITE_IDX_IDLE[0];
-    }
+                .insert(AnimationIndices {
+                    first: SPRITE_IDX_IDLE[0],
+                    last: SPRITE_IDX_IDLE[1],
+                })
+                .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
+                }
+        sprite.index = SPRITE_IDX_IDLE[0];
 }
 
 fn apply_rise_sprite(
