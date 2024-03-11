@@ -39,7 +39,7 @@ enum Direction {
 }
 
 #[derive(Component, PartialEq)]
-enum Activity {
+enum Action {
     Idle,
     Walk,
     Jump,
@@ -108,7 +108,7 @@ fn setup(
     ))
     .insert(KinematicCharacterController::default())
     .insert(Direction::Right)
-    .insert(Activity::Idle)
+    .insert(Action::Idle)
     .insert(AnimationIndices {
         first: SPRITE_IDX_IDLE[0],
         last: SPRITE_IDX_IDLE[1],
@@ -135,11 +135,11 @@ fn movement(
 
     match player.translation {
         Some(vec) => {
-            commands.entity(entity).insert(Activity::Walk);
+            commands.entity(entity).insert(Action::Walk);
             player.translation = Some(Vec2::new(movement, vec.y))
         },
         None => {
-            commands.entity(entity).insert(Activity::Idle);
+            commands.entity(entity).insert(Action::Idle);
             player.translation = Some(Vec2::new(movement, 0.))
         },
     }
@@ -210,7 +210,7 @@ const WALK_CYCLE_INDICES: AnimationIndices = AnimationIndices {
 };
 fn apply_movement_animation(
     mut commands: Commands,
-    mut query: Query<(Entity, &KinematicCharacterControllerOutput, &Activity, &mut TextureAtlas)>,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput, &Action, &mut TextureAtlas)>,
 ) {
     if query.is_empty() {
         return;
@@ -218,7 +218,7 @@ fn apply_movement_animation(
 
     let (player, output, activity, mut sprite) = query.single_mut();
 
-    if activity == &Activity::Walk {
+    if activity == &Action::Walk {
         info!("walking");
         return;
     }
@@ -240,7 +240,7 @@ fn apply_idle_animation(
         Entity,
         &KinematicCharacterControllerOutput,
         &mut TextureAtlas,
-        &Activity,
+        &Action,
     )>,
     // ), Without<Animation>>,
 ) {
@@ -250,12 +250,12 @@ fn apply_idle_animation(
 
     let (player, output, mut sprite, activity) = query.single_mut();
 
-    if activity == &Activity::Idle {
+    if activity == &Action::Idle {
         info!("idling");
         return;
     }
 
-    if output.desired_translation.x == 0.0 && output.grounded && activity == &Activity::Idle {
+    if output.desired_translation.x == 0.0 && output.grounded && activity == &Action::Idle {
         info!("applying idle animation");
         commands
             .entity(player)
@@ -318,6 +318,7 @@ fn apply_fall_sprite(
         // sprite.index = SPRITE_IDX_FALL[0];
     }
 }
+
 fn update_direction(
     mut commands: Commands,
     query: Query<(Entity, &KinematicCharacterControllerOutput)>,
