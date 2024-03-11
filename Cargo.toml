@@ -1,0 +1,18 @@
+[package]
+edition = "2021"
+name = "bevy_sprite_experiment"
+version = "0.1.0"
+
+[dependencies]
+bevy = "0.13.0"
+bevy_rapier2d = "0.25.0"
+
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = "z"
