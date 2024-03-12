@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
+use bevy_editor_pls::prelude::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 mod animation;
 mod platforms;
 mod player;
@@ -38,6 +40,10 @@ fn main() {
         .add_plugins((
             RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(200.),
             RapierDebugRenderPlugin::default(),
+        ))
+        .add_plugins((
+            WorldInspectorPlugin::new(),
+            EditorPlugin::default(),
         ))
         .add_plugins((PlatformsPlugin, PlayerPlugin, AnimationPlugin))
         .add_systems(Startup, setup)

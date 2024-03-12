@@ -13,11 +13,11 @@ const SPRITE_TILE_HEIGHT: f32 = 32.;
 const SPRITE_RENDER_WIDTH: f32 = 128.;
 const SPRITE_RENDER_HEIGHT: f32 = 128.;
 const SPRITE_IDX_STAND: usize = 0;
-const SPRITE_IDX_IDLE: &[usize] = &[0, 1];
+const SPRITE_IDX_IDLE: &[usize] = &[8, 9];
 const SPRITE_IDX_WALK: &[usize] = &[16, 17, 18, 19];
 const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
 const SPRITE_IDX_FALL: &[usize] = &[43, 44, 45, 46, 47];
-const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(750);
+const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(250);
 const WALK_CYCLE_DELAY: Duration = Duration::from_millis(500);
 const RISE_CYCLE_DELAY: Duration = Duration::from_millis(700);
 const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
@@ -38,8 +38,9 @@ enum Direction {
     Right,
 }
 
-#[derive(Component, PartialEq)]
-enum Action {
+#[derive(Clone, Component, Debug, Default, Eq, Hash, PartialEq, States)]
+enum ActionState {
+    #[default]
     Idle,
     Walk,
     Jump,
@@ -50,21 +51,29 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (
+        app
+            .init_state::<ActionState>()
+            .add_systems(Startup, setup)
+            .add_systems(FixedUpdate, (
+                // idle,
                 movement,
-                jump,
-                rise,
+                // jump,
+                // rise,
                 fall,
-                apply_idle_animation,
-                apply_movement_animation,
-                // apply_rise_sprite,
-                // apply_fall_sprite,
-                update_direction,
-                update_sprite_direction,
-            ),
-        );
+                update_direction
+            ))
+            .add_systems(
+                Update,
+                (
+                    log_transitions,
+                    apply_idle_animation,
+                    apply_movement_animation,
+                    // apply_rise_sprite,
+                    // apply_fall_sprite,
+                    // update_direction,
+                    update_sprite_direction,
+                ),
+            );
     }
 }
 
@@ -106,14 +115,52 @@ fn setup(
         SPRITE_TILE_WIDTH / 2.,
         SPRITE_TILE_HEIGHT / 2.,
     ))
-    .insert(KinematicCharacterController::default())
-    .insert(Direction::Right)
-    .insert(Action::Idle)
-    .insert(AnimationIndices {
-        first: SPRITE_IDX_IDLE[0],
-        last: SPRITE_IDX_IDLE[1],
+    .insert(KinematicCharacterController {
+        snap_to_ground: Some(CharacterLength::Relative(0.1)),
+        ..default()
     })
-    .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
+    .insert(Direction::Right)
+    .insert(Animation {
+        sprites: SPRITE_IDX_IDLE,
+        timer: Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating),
+    });
+    // .insert(AnimationIndices {
+    //     first: SPRITE_IDX_IDLE[0],
+    //     last: SPRITE_IDX_IDLE[1],
+    // })
+    // .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
+}
+
+fn log_transitions(mut transitions: EventReader<StateTransitionEvent<ActionState>>) {
+    for transition in transitions.read() {
+        info!(
+            "transition: {:?} => {:?}",
+            transition.before, transition.after
+        );
+    }
+}
+
+fn idle(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut KinematicCharacterController)>,
+) {
+    let (entity, mut player) = query.single_mut();
+
+    // let mut movement = 0.0;
+
+    // if movement != 0.0 {
+    //     movement = 0.0;
+    // }
+
+    // match player.translation {
+    //     Some(vec) => {
+    //         player.translation = Some(Vec2::new(movement, vec.y))
+    //     },
+    //     None => {
+    //         player.translation = Some(Vec2::new(movement, 0.))
+    //     },
+    // }
 }
 
 fn movement(
@@ -121,25 +168,27 @@ fn movement(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut query: Query<(Entity, &mut KinematicCharacterController)>,
+    mut state: ResMut<NextState<ActionState>>,
 ) {
     let (entity, mut player) = query.single_mut();
 
     let mut movement = 0.0;
 
+    state.set(ActionState::Idle);
     if input.pressed(KeyCode::ArrowRight) {
+        state.set(ActionState::Walk);
         movement += time.delta_seconds() * PLAYER_VELOCITY_X;
     }
     if input.pressed(KeyCode::ArrowLeft) {
+        state.set(ActionState::Walk);
         movement -= time.delta_seconds() * PLAYER_VELOCITY_X;
     }
 
     match player.translation {
         Some(vec) => {
-            commands.entity(entity).insert(Action::Walk);
             player.translation = Some(Vec2::new(movement, vec.y))
         },
         None => {
-            commands.entity(entity).insert(Action::Idle);
             player.translation = Some(Vec2::new(movement, 0.))
         },
     }
@@ -210,27 +259,34 @@ const WALK_CYCLE_INDICES: AnimationIndices = AnimationIndices {
 };
 fn apply_movement_animation(
     mut commands: Commands,
-    mut query: Query<(Entity, &KinematicCharacterControllerOutput, &Action, &mut TextureAtlas)>,
+    state: Res<State<ActionState>>,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput, &mut TextureAtlas)>,
 ) {
     if query.is_empty() {
         return;
     }
-
-    let (player, output, activity, mut sprite) = query.single_mut();
-
-    if activity == &Action::Walk {
-        info!("walking");
+    if state.get() != &ActionState::Walk {
         return;
     }
 
+    let (player, output, mut sprite) = query.single_mut();
+
     if output.desired_translation.x != 0.0 && output.grounded {
+    // if output.grounded {
         info!("applying walk animation");
         commands
             .entity(player)
-            .insert(WALK_CYCLE_INDICES)
-            .insert(AnimationTimer(Timer::new(WALK_CYCLE_DELAY, TimerMode::Repeating)));
+            .insert(Animation {
+                sprites: SPRITE_IDX_WALK,
+                timer: Timer::new(WALK_CYCLE_DELAY, TimerMode::Repeating),
+            });
 
-        info!("sprite.index: {}", sprite.index);
+        // if sprite.index < *SPRITE_IDX_WALK.last().unwrap() {
+        //     sprite.index += 1;
+        // } else {
+        //     sprite.index = *SPRITE_IDX_WALK.first().unwrap();
+        // }
+        info!("{}", sprite.index);
     }
 }
 
@@ -240,32 +296,37 @@ fn apply_idle_animation(
         Entity,
         &KinematicCharacterControllerOutput,
         &mut TextureAtlas,
-        &Action,
     )>,
+    state: Res<State<ActionState>>,
     // ), Without<Animation>>,
 ) {
     if query.is_empty() {
         return;
     }
-
-    let (player, output, mut sprite, activity) = query.single_mut();
-
-    if activity == &Action::Idle {
-        info!("idling");
+    if state.get() != &ActionState::Idle {
         return;
     }
 
-    if output.desired_translation.x == 0.0 && output.grounded && activity == &Action::Idle {
+    let (player, output, mut sprite) = query.single_mut();
+
+    if output.desired_translation.x == 0.0 && output.grounded {
+    // if output.grounded {
         info!("applying idle animation");
         commands
             .entity(player)
-                .insert(AnimationIndices {
-                    first: SPRITE_IDX_IDLE[0],
-                    last: SPRITE_IDX_IDLE[1],
-                })
-                .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
-                }
-        sprite.index = SPRITE_IDX_IDLE[0];
+                .insert(Animation {
+                    sprites: SPRITE_IDX_IDLE,
+                    timer: Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating),
+                });
+        // sprite.index = SPRITE_IDX_IDLE[0];
+                // sprite.index += 1;
+                // .insert(AnimationIndices {
+                //     first: 0,
+                //     last: 1,
+                // })
+                // .insert(AnimationTimer(Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating)));
+        // sprite.index = 0;
+    }
 }
 
 fn apply_rise_sprite(
