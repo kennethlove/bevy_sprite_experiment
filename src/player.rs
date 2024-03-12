@@ -55,7 +55,7 @@ impl Plugin for PlayerPlugin {
             .init_state::<ActionState>()
             .add_systems(Startup, setup)
             .add_systems(FixedUpdate, (
-                // idle,
+                idle,
                 movement,
                 // jump,
                 // rise,
@@ -120,10 +120,10 @@ fn setup(
         ..default()
     })
     .insert(Direction::Right)
-    .insert(Animation {
-        sprites: SPRITE_IDX_IDLE,
-        timer: Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating),
-    });
+    .insert(Animation::new(
+        SPRITE_IDX_IDLE,
+        IDLE_CYCLE_DELAY,
+    ));
     // .insert(AnimationIndices {
     //     first: SPRITE_IDX_IDLE[0],
     //     last: SPRITE_IDX_IDLE[1],
@@ -144,8 +144,10 @@ fn idle(
     mut commands: Commands,
     time: Res<Time>,
     mut query: Query<(Entity, &mut KinematicCharacterController)>,
+    mut state: ResMut<NextState<ActionState>>,
 ) {
     let (entity, mut player) = query.single_mut();
+    state.set(ActionState::Idle);
 
     // let mut movement = 0.0;
 
@@ -276,17 +278,17 @@ fn apply_movement_animation(
         info!("applying walk animation");
         commands
             .entity(player)
-            .insert(Animation {
-                sprites: SPRITE_IDX_WALK,
-                timer: Timer::new(WALK_CYCLE_DELAY, TimerMode::Repeating),
-            });
+            .insert(Animation::new(
+                SPRITE_IDX_WALK,
+                WALK_CYCLE_DELAY
+            ));
+            sprite.index = *SPRITE_IDX_WALK.first().unwrap();
 
         // if sprite.index < *SPRITE_IDX_WALK.last().unwrap() {
         //     sprite.index += 1;
         // } else {
         //     sprite.index = *SPRITE_IDX_WALK.first().unwrap();
         // }
-        info!("{}", sprite.index);
     }
 }
 
@@ -296,6 +298,7 @@ fn apply_idle_animation(
         Entity,
         &KinematicCharacterControllerOutput,
         &mut TextureAtlas,
+        &Animation,
     )>,
     state: Res<State<ActionState>>,
     // ), Without<Animation>>,
@@ -307,17 +310,17 @@ fn apply_idle_animation(
         return;
     }
 
-    let (player, output, mut sprite) = query.single_mut();
+    let (player, output, mut sprite, animation) = query.single_mut();
 
     if output.desired_translation.x == 0.0 && output.grounded {
     // if output.grounded {
         info!("applying idle animation");
         commands
             .entity(player)
-                .insert(Animation {
-                    sprites: SPRITE_IDX_IDLE,
-                    timer: Timer::new(IDLE_CYCLE_DELAY, TimerMode::Repeating),
-                });
+                .insert(Animation::new(
+                    SPRITE_IDX_IDLE,
+                    IDLE_CYCLE_DELAY,
+                ));
         // sprite.index = SPRITE_IDX_IDLE[0];
                 // sprite.index += 1;
                 // .insert(AnimationIndices {
