@@ -19,9 +19,13 @@ const SPRITE_INDICES_WALK: AnimationIndices = AnimationIndices {
     first: 16,
     last: 19,
 };
+// const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
+//     first: 41,
+//     last: 42,
+// };
 const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
     first: 41,
-    last: 42,
+    last: 47,
 };
 const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
 const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
@@ -126,7 +130,7 @@ fn setup(
             sprite: Sprite::default(),
             atlas: TextureAtlas {
                 layout: sprite_atlas.0.clone(),
-                index: SPRITE_INDICES_BLINK.first,
+                index: SPRITE_INDICES_FALL.first,
             },
             texture: sprite,
             transform: Transform {
@@ -147,12 +151,12 @@ fn setup(
         ))
         .insert(KinematicCharacterController::default())
         .insert(Direction::Right)
-        .insert(SPRITE_INDICES_BLINK)
+        .insert(SPRITE_INDICES_FALL)
         .insert(AnimationTimer(Timer::new(
             IDLE_CYCLE_DELAY,
             TimerMode::Repeating,
         )));
-    state.set(ActionState::Idle)
+    state.set(ActionState::Fall)
 }
 
 fn log_transitions(mut transitions: EventReader<StateTransitionEvent<ActionState>>) {
@@ -237,19 +241,17 @@ fn rise(
 
     jump.0 += movement;
 
-    if jump.0 > 0. {
-        state.set(ActionState::Jump);
-    } else {
-        state.set(ActionState::Fall);
-    }
-
     match player.translation {
         Some(vec) => player.translation = Some(Vec2::new(vec.x, movement)),
         None => player.translation = Some(Vec2::new(0.0, movement)),
     }
 }
 
-fn fall(time: Res<Time>, mut query: Query<&mut KinematicCharacterController, Without<Jump>>) {
+fn fall(
+    time: Res<Time>,
+    mut state: ResMut<NextState<ActionState>>,
+    mut query: Query<&mut KinematicCharacterController, Without<Jump>>,
+) {
     if query.is_empty() {
         return;
     }
@@ -308,13 +310,11 @@ fn apply_rise_sprite(
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y > 0. {
         info!("applying rise sprite");
-        commands
-            .entity(player)
-            .insert(SPRITE_INDICES_RISE)
-            .insert(AnimationTimer(Timer::new(
-                RISE_CYCLE_DELAY,
-                TimerMode::Once,
-            )));
+        commands.entity(player).insert(SPRITE_INDICES_RISE);
+        // .insert(AnimationTimer(Timer::new(
+        //     RISE_CYCLE_DELAY,
+        //     TimerMode::Once,
+        // )));
     }
 }
 
@@ -327,6 +327,7 @@ fn apply_fall_sprite(
         return;
     }
 
+    info!("fall sprite");
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y < 0. {
         info!("applying fall sprite");
