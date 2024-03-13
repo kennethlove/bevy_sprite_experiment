@@ -1,7 +1,7 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 use bevy_editor_pls::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_rapier2d::prelude::*;
 mod animation;
 mod platforms;
 mod player;
@@ -41,19 +41,14 @@ fn main() {
             RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(200.),
             RapierDebugRenderPlugin::default(),
         ))
-        .add_plugins((
-            WorldInspectorPlugin::new(),
-            EditorPlugin::default(),
-        ))
+        .add_plugins((WorldInspectorPlugin::new(), EditorPlugin::default()))
         .add_plugins((PlatformsPlugin, PlayerPlugin, AnimationPlugin))
         .add_systems(Startup, setup)
         .add_systems(Update, bevy::window::close_on_esc)
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-) {
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 
     commands

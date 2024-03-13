@@ -20,10 +20,7 @@ pub struct AnimationPlugin;
 
 impl Plugin for AnimationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            // animate_sprites,
-            animate
-        ));
+        app.add_systems(Update, (animate_sprites, animate));
     }
 }
 
@@ -60,7 +57,7 @@ fn animate_sprites(
     for (indices, mut timer, mut atlas) in &mut query {
         timer.tick(time.delta());
         if timer.just_finished() {
-            atlas.index = if atlas.index == indices.last {
+            atlas.index = if atlas.index >= indices.last || atlas.index < indices.first {
                 indices.first
             } else {
                 atlas.index + 1
