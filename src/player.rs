@@ -34,7 +34,7 @@ const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
 const SPRITE_IDX_FALL: &[usize] = &[43, 44, 45, 46, 47];
 const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(250);
 const WALK_CYCLE_DELAY: Duration = Duration::from_millis(500);
-const RISE_CYCLE_DELAY: Duration = Duration::from_millis(400);
+const RISE_CYCLE_DELAY: Duration = Duration::from_millis(250);
 const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
 const PLAYER_VELOCITY_X: f32 = 400.;
 const PLAYER_VELOCITY_Y: f32 = 450.;
@@ -321,7 +321,7 @@ fn apply_rise_sprite(
 
 fn apply_fall_sprite(
     mut commands: Commands,
-    mut query: Query<(Entity, &KinematicCharacterControllerOutput), With<Jump>>,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput), Without<Jump>>,
     mut state: ResMut<NextState<ActionState>>,
 ) {
     if query.is_empty() {
