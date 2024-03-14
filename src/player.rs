@@ -29,7 +29,6 @@ const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
     last: 47,
 };
 const ANIMATION_CYCLE_DELAY: Duration = Duration::from_millis(250);
-const RUNNING_CYCLE_DELAY: Duration = Duration::from_millis(150);
 const PLAYER_WALK_VELOCITY_X: f32 = SPRITE_RENDER_WIDTH;
 const PLAYER_RUN_VELOCITY_X: f32 = SPRITE_RENDER_WIDTH * 1.5;
 const PLAYER_VELOCITY_Y: f32 = SPRITE_RENDER_HEIGHT * 4.;
@@ -101,7 +100,6 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 Update,
                 (
-                    log_transitions,
                     apply_idle_animation.run_if(in_state(ActionState::Idle)),
                     apply_walk_animation.run_if(in_state(ActionState::Walk)),
                     apply_run_animation.run_if(in_state(ActionState::Run)),
@@ -153,15 +151,6 @@ fn setup(
             TimerMode::Repeating,
         )));
     state.set(ActionState::Fall)
-}
-
-fn log_transitions(mut transitions: EventReader<StateTransitionEvent<ActionState>>) {
-    for transition in transitions.read() {
-        info!(
-            "transition: {:?} => {:?}",
-            transition.before, transition.after
-        );
-    }
 }
 
 fn idle(mut state: ResMut<NextState<ActionState>>) {
