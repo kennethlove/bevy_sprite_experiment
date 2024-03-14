@@ -8,6 +8,7 @@ bevy = "0.13.0"
 bevy-inspector-egui = "0.23.4"
 bevy_editor_pls = "0.8.1"
 bevy_rapier2d = "0.25.0"
+rand = "0.8.5"
 
 
 [profile.dev]

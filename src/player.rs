@@ -5,6 +5,7 @@ use crate::WINDOW_BOTTOM_Y;
 use crate::WINDOW_LEFT_X;
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
+use rand::prelude::*;
 
 const SPRITE_SHEET_COLS: usize = 8;
 const SPRITE_SHEET_ROWS: usize = 9;
@@ -21,22 +22,19 @@ const SPRITE_INDICES_WALK: AnimationIndices = AnimationIndices {
 const SPRITE_INDICES_RUN: AnimationIndices = AnimationIndices { first: 24, last: 31 };
 const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
     first: 41,
-    last: 42,
+    last: 43,
 };
 const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
     first: 43,
     last: 47,
 };
-const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(350);
-const WALK_CYCLE_DELAY: Duration = Duration::from_millis(50);
-const RUN_CYCLE_DELAY: Duration = Duration::from_millis(500);
-const RISE_CYCLE_DELAY: Duration = Duration::from_millis(250);
-const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
-const PLAYER_WALK_VELOCITY_X: f32 = 100.;
-const PLAYER_RUN_VELOCITY_X: f32 = 350.;
-const PLAYER_VELOCITY_Y: f32 = 450.;
+const ANIMATION_CYCLE_DELAY: Duration = Duration::from_millis(250);
+const RUNNING_CYCLE_DELAY: Duration = Duration::from_millis(150);
+const PLAYER_WALK_VELOCITY_X: f32 = SPRITE_RENDER_WIDTH;
+const PLAYER_RUN_VELOCITY_X: f32 = SPRITE_RENDER_WIDTH * 1.5;
+const PLAYER_VELOCITY_Y: f32 = SPRITE_RENDER_HEIGHT * 4.;
 
-const MAX_JUMP_HEIGHT: f32 = 230.;
+const MAX_JUMP_HEIGHT: f32 = SPRITE_RENDER_HEIGHT * 2.;
 
 #[derive(Component)]
 pub struct Player;
@@ -151,7 +149,7 @@ fn setup(
         .insert(Direction::Right)
         .insert(SPRITE_INDICES_FALL)
         .insert(AnimationTimer(Timer::new(
-            IDLE_CYCLE_DELAY,
+            ANIMATION_CYCLE_DELAY,
             TimerMode::Repeating,
         )));
     state.set(ActionState::Fall)
@@ -171,14 +169,12 @@ fn idle(mut state: ResMut<NextState<ActionState>>) {
 }
 
 fn movement(
-    mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut KinematicCharacterController)>,
+    mut query: Query<&mut KinematicCharacterController>,
     mut state: ResMut<NextState<ActionState>>,
 ) {
-    let (entity, mut player) = query.single_mut();
-
+    let mut player = query.single_mut();
     let mut movement = 0.0;
 
     if input.pressed(KeyCode::ArrowRight) {
@@ -274,6 +270,27 @@ fn fall(
     }
 }
 
+fn apply_idle_animation(
+    mut commands: Commands,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput)>,
+) {
+    if query.is_empty() {
+        return;
+    }
+
+    let (player, output) = query.single_mut();
+
+    if output.desired_translation.x == 0.0 && output.grounded {
+        let mut rng = thread_rng();
+
+        if rng.gen::<f64>() > 0.1 {
+            commands.entity(player).insert(SPRITE_INDICES_IDLE);
+        } else {
+            commands.entity(player).insert(SPRITE_INDICES_BLINK);
+        }
+    }
+}
+
 fn apply_walk_animation(
     mut commands: Commands,
     mut query: Query<(Entity, &KinematicCharacterControllerOutput)>,
@@ -285,7 +302,6 @@ fn apply_walk_animation(
     let (player, output) = query.single_mut();
 
     if output.desired_translation.x != 0.0 && output.grounded {
-        info!("applying walk animation");
         commands.entity(player).insert(SPRITE_INDICES_WALK);
     }
 }
@@ -301,25 +317,7 @@ fn apply_run_animation(
     let (player, output) = query.single_mut();
 
     if output.desired_translation.x != 0.0 && output.grounded {
-        info!("applying run animation");
         commands.entity(player).insert(SPRITE_INDICES_RUN);
-    }
-}
-
-fn apply_idle_animation(
-    mut commands: Commands,
-    mut query: Query<(Entity, &KinematicCharacterControllerOutput)>,
-) {
-    if query.is_empty() {
-        return;
-    }
-
-    let (player, output) = query.single_mut();
-
-    if output.desired_translation.x == 0.0 && output.grounded {
-        info!("applying idle animation");
-
-        commands.entity(player).insert(SPRITE_INDICES_IDLE);
     }
 }
 
@@ -333,14 +331,9 @@ fn apply_rise_sprite(
 
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y > 0. {
-        info!("applying rise sprite");
         commands
             .entity(player)
-            .insert(SPRITE_INDICES_RISE)
-            .insert(AnimationTimer(Timer::new(
-                RISE_CYCLE_DELAY,
-                TimerMode::Repeating,
-            )));
+            .insert(SPRITE_INDICES_RISE);
     }
 }
 
@@ -355,9 +348,8 @@ fn apply_fall_sprite(
 
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y < 0. {
-        info!("applying fall sprite");
-        state.set(ActionState::Fall);
         commands.entity(player).insert(SPRITE_INDICES_FALL);
+        state.set(ActionState::Fall);
     }
 }
 

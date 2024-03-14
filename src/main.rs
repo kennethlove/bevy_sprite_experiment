@@ -38,7 +38,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest()),
         ) // prevents blurry sprites
         .add_plugins((
-            RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(200.),
+            RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(64.),
             RapierDebugRenderPlugin::default(),
         ))
         .add_plugins((WorldInspectorPlugin::new(), EditorPlugin::default()))
