@@ -18,25 +18,22 @@ const SPRITE_INDICES_WALK: AnimationIndices = AnimationIndices {
     first: 16,
     last: 19,
 };
+const SPRITE_INDICES_RUN: AnimationIndices = AnimationIndices { first: 24, last: 31 };
 const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
     first: 41,
     last: 42,
 };
-// const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
-//     first: 41,
-//     last: 47,
-// };
-const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
 const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
     first: 43,
     last: 47,
 };
-const SPRITE_IDX_FALL: &[usize] = &[43, 44, 45, 46, 47];
-const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(250);
-const WALK_CYCLE_DELAY: Duration = Duration::from_millis(500);
+const IDLE_CYCLE_DELAY: Duration = Duration::from_millis(350);
+const WALK_CYCLE_DELAY: Duration = Duration::from_millis(50);
+const RUN_CYCLE_DELAY: Duration = Duration::from_millis(500);
 const RISE_CYCLE_DELAY: Duration = Duration::from_millis(250);
 const FALL_CYCLE_DELAY: Duration = Duration::from_millis(700);
-const PLAYER_VELOCITY_X: f32 = 400.;
+const PLAYER_WALK_VELOCITY_X: f32 = 100.;
+const PLAYER_RUN_VELOCITY_X: f32 = 350.;
 const PLAYER_VELOCITY_Y: f32 = 450.;
 
 const MAX_JUMP_HEIGHT: f32 = 230.;
@@ -59,6 +56,7 @@ enum ActionState {
     Setup,
     Idle,
     Walk,
+    Run,
     Jump,
     Fall,
 }
@@ -107,7 +105,8 @@ impl Plugin for PlayerPlugin {
                 (
                     log_transitions,
                     apply_idle_animation.run_if(in_state(ActionState::Idle)),
-                    apply_movement_animation.run_if(in_state(ActionState::Walk)),
+                    apply_walk_animation.run_if(in_state(ActionState::Walk)),
+                    apply_run_animation.run_if(in_state(ActionState::Run)),
                     apply_rise_sprite.run_if(in_state(ActionState::Jump)),
                     apply_fall_sprite.run_if(in_state(ActionState::Fall)),
                     update_sprite_direction,
@@ -183,12 +182,22 @@ fn movement(
     let mut movement = 0.0;
 
     if input.pressed(KeyCode::ArrowRight) {
-        state.set(ActionState::Walk);
-        movement += time.delta_seconds() * PLAYER_VELOCITY_X;
+        if input.pressed(KeyCode::ShiftLeft) {
+            movement += time.delta_seconds() * PLAYER_RUN_VELOCITY_X;
+            state.set(ActionState::Run);
+        } else {
+            movement += time.delta_seconds() * PLAYER_WALK_VELOCITY_X;
+            state.set(ActionState::Walk);
+        }
     }
     if input.pressed(KeyCode::ArrowLeft) {
-        state.set(ActionState::Walk);
-        movement -= time.delta_seconds() * PLAYER_VELOCITY_X;
+        if input.pressed(KeyCode::ShiftLeft) {
+            movement -= time.delta_seconds() * PLAYER_RUN_VELOCITY_X;
+            state.set(ActionState::Run);
+        } else {
+            movement -= time.delta_seconds() * PLAYER_WALK_VELOCITY_X;
+            state.set(ActionState::Walk);
+        }
     }
 
     match player.translation {
@@ -265,7 +274,7 @@ fn fall(
     }
 }
 
-fn apply_movement_animation(
+fn apply_walk_animation(
     mut commands: Commands,
     mut query: Query<(Entity, &KinematicCharacterControllerOutput)>,
 ) {
@@ -278,6 +287,22 @@ fn apply_movement_animation(
     if output.desired_translation.x != 0.0 && output.grounded {
         info!("applying walk animation");
         commands.entity(player).insert(SPRITE_INDICES_WALK);
+    }
+}
+
+fn apply_run_animation(
+    mut commands: Commands,
+    mut query: Query<(Entity, &KinematicCharacterControllerOutput)>,
+) {
+    if query.is_empty() {
+        return;
+    }
+
+    let (player, output) = query.single_mut();
+
+    if output.desired_translation.x != 0.0 && output.grounded {
+        info!("applying run animation");
+        commands.entity(player).insert(SPRITE_INDICES_RUN);
     }
 }
 
