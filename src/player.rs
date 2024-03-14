@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use crate::animation::{Animation, AnimationIndices, AnimationTimer};
+use crate::animation::{AnimationIndices, AnimationTimer};
 use crate::WINDOW_BOTTOM_Y;
 use crate::WINDOW_LEFT_X;
 use bevy::prelude::*;
-use bevy::render::texture::{self, TEXTURE_ASSET_INDEX};
 use bevy_rapier2d::prelude::*;
 
 const SPRITE_SHEET_COLS: usize = 8;
@@ -19,14 +18,14 @@ const SPRITE_INDICES_WALK: AnimationIndices = AnimationIndices {
     first: 16,
     last: 19,
 };
-// const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
-//     first: 41,
-//     last: 42,
-// };
 const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
     first: 41,
-    last: 47,
+    last: 42,
 };
+// const SPRITE_INDICES_RISE: AnimationIndices = AnimationIndices {
+//     first: 41,
+//     last: 47,
+// };
 const SPRITE_IDX_JUMP: &[usize] = &[40, 41, 42];
 const SPRITE_INDICES_FALL: AnimationIndices = AnimationIndices {
     first: 43,
@@ -310,11 +309,13 @@ fn apply_rise_sprite(
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y > 0. {
         info!("applying rise sprite");
-        commands.entity(player).insert(SPRITE_INDICES_RISE);
-        // .insert(AnimationTimer(Timer::new(
-        //     RISE_CYCLE_DELAY,
-        //     TimerMode::Once,
-        // )));
+        commands
+            .entity(player)
+            .insert(SPRITE_INDICES_RISE)
+            .insert(AnimationTimer(Timer::new(
+                RISE_CYCLE_DELAY,
+                TimerMode::Repeating,
+            )));
     }
 }
 
@@ -327,16 +328,11 @@ fn apply_fall_sprite(
         return;
     }
 
-    info!("fall sprite");
     let (player, output) = query.single_mut();
     if !output.grounded && output.desired_translation.y < 0. {
         info!("applying fall sprite");
         state.set(ActionState::Fall);
         commands.entity(player).insert(SPRITE_INDICES_FALL);
-        // .insert(AnimationTimer(Timer::new(
-        //     FALL_CYCLE_DELAY,
-        //     TimerMode::Once,
-        // )));
     }
 }
 
