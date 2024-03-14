@@ -98,8 +98,8 @@ impl Plugin for PlayerPlugin {
                     idle,
                     movement.after(idle),
                     jump.after(idle),
-                    rise.after(idle),
-                    fall.after(idle),
+                    rise.after(jump),
+                    fall.after(rise),
                     update_direction,
                 ),
             )
